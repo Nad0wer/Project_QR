@@ -475,32 +475,37 @@
       reader.readAsDataURL(file);
     }
 
-    // Генерация QR из строки (с возможностью потом скачать)
-    function generateQRFromString(textData) {
-      qrcodeDiv.innerHTML = "";
-      try {
-        qrcodeWrapper.classList.add("visible");
-        currentQR = new QRCode(qrcodeDiv, {
-          text: textData,
-          width: 280,
-          height: 280,
-          colorDark: "#dabfff",
-          colorLight: "#404042",
-          correctLevel: QRCode.CorrectLevel.H
-        });
-        // Показываем кнопку "Скачать QR-код" только после успешной генерации
-        downloadBtnArea.style.display = "block";
-        // Через небольшой таймаут пытаемся найти canvas для скачивания
-        setTimeout(() => {
-          captureCanvasForDownload();
-        }, 100);
-      } catch(e) {
-        console.error(e);
-        alert("Ошибка генерации QR: данные слишком объёмные или неверный формат.");
-        downloadBtnArea.style.display = "none";
-      }
-    }
-
+function generateQRFromString(textData) {
+  // Проверка длины данных
+  if(textData.length > 2950) {
+    alert("Слишком много данных! QR-код не может вместить такой объем.\nМаксимум ~2950 символов.\nПопробуйте сократить текст или использовать файл меньшего размера.");
+    qrcodeWrapper.classList.remove("visible");
+    return;
+  }
+  
+  qrcodeDiv.innerHTML = "";
+  qrcodeWrapper.classList.add("visible");
+  try {
+    currentQR = new QRCode(qrcodeDiv, {
+      text: textData,
+      width: 280,
+      height: 280,
+      colorDark: "#dabfff",
+      colorLight: "#404042",
+      correctLevel: QRCode.CorrectLevel.H
+    });
+    downloadBtnArea.style.display = "block";
+    setTimeout(() => {
+      const canvas = qrcodeDiv.querySelector("canvas");
+      if(canvas) currentQRCanvas = canvas;
+    }, 100);
+  } catch(e) {
+    console.error("QR Error:", e);
+    alert("Ошибка генерации QR: " + e.message + "\nПопробуйте сократить данные или убрать спецсимволы.");
+    downloadBtnArea.style.display = "none";
+    qrcodeWrapper.classList.remove("visible");
+  }
+}
     // Сохраняем canvas (если создан библиотекой) для последующего скачивания
     function captureCanvasForDownload() {
       const container = document.getElementById("qrcode");
@@ -621,19 +626,41 @@
           lastDataType = "text";
           return txt;
         case "contact":
-          let name = contactName.value.trim();
-          let phone = contactPhone.value.trim();
-          let email = contactEmail.value.trim();
-          let org = contactOrg.value.trim();
-          if(!name && !phone && !email) { alert("Заполните имя, телефон или email"); return null; }
-          let vcard = "BEGIN:VCARD\nVERSION:3.0\n";
-          if(name) vcard += `FN:${name}\nN:${name};;;\n`;
-          if(phone) vcard += `TEL:${phone}\n`;
-          if(email) vcard += `EMAIL:${email}\n`;
-          if(org) vcard += `ORG:${org}\n`;
-          vcard += "END:VCARD";
-          lastDataType = "contact";
-          return vcard;
+        let name = contactName.value.trim();
+        let phone = contactPhone.value.trim();
+        let email = contactEmail.value.trim();
+        let org = contactOrg.value.trim();
+  
+        if(!name && !phone && !email) { 
+          alert("Заполните хотя бы одно поле"); 
+          return null; 
+      }
+  
+  // Функция для экранирования спецсимволов в vCard
+  function escapeVCard(str) {
+    if (!str) return '';
+    // Экранируем спецсимволы: \ , ; 
+    return str.replace(/[\\,;]/g, '\\$&');
+  }
+  
+  let vcard = "BEGIN:VCARD\nVERSION:3.0\n";
+  if(name) vcard += `FN:${escapeVCard(name)}\nN:${escapeVCard(name)};;;\n`;
+  if(phone) {
+    // Очищаем телефон от лишних пробелов и спецсимволов
+    let cleanPhone = phone.replace(/[^0-9+]/g, '');
+    vcard += `TEL:${cleanPhone}\n`;
+  }
+  if(email) vcard += `EMAIL:${escapeVCard(email)}\n`;
+  if(org) vcard += `ORG:${escapeVCard(org)}\n`;
+  vcard += "END:VCARD";
+  
+  // Проверка длины (QR имеет ограничение)
+  if(vcard.length > 2800) {
+    alert("Слишком много данных для контакта. Сократите текст.");
+    return null;
+  }
+  
+  return vcard;
         case "file":
           if(!fileInput.files.length && !lastGeneratedData?.startsWith("FILE_DATA:")) {
             alert("Выберите файл через область загрузки");
