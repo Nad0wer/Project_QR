@@ -274,13 +274,12 @@
 </head>
 <body>
   <h1>⚡ QR·Studio</h1>
-  <div class="sub">для ссылок, текста, контактов и файлов</div>
+  <div class="sub">для ссылок, текста и файлов</div>
 
   <div class="glass-panel">
     <div class="format-selector">
       <button class="format-btn active" data-format="url">🔗 Ссылка / URL</button>
       <button class="format-btn" data-format="text">📝 Текст</button>
-      <button class="format-btn" data-format="contact">📇 Контакт</button>
       <button class="format-btn" data-format="file">📎 Файл</button>
     </div>
 
@@ -292,16 +291,8 @@
 
     <!-- Панель: Текст -->
     <div id="panel-text" class="content-pane">
-      <textarea id="plainText" class="input-field" rows="3" placeholder="Введите любой текст, заметку, секретное сообщение..."></textarea>
-    </div>
-
-    <!-- Панель: Контакт (ТЕКСТОВЫЙ ФОРМАТ - без vCard, без ошибок) -->
-    <div id="panel-contact" class="content-pane">
-      <input type="text" id="contactName" class="input-field" placeholder="Имя и фамилия">
-      <input type="tel" id="contactPhone" class="input-field" placeholder="Телефон (напр. +7 999 123-45-67)">
-      <input type="email" id="contactEmail" class="input-field" placeholder="Email">
-      <input type="text" id="contactOrg" class="input-field" placeholder="Компания / должность">
-      <div class="info-tip">Контакт сохранится в виде текста — поддерживается всеми смартфонами</div>
+      <textarea id="plainText" class="input-field" rows="4" placeholder="Введите любой текст, заметку, секретное сообщение..."></textarea>
+      <div class="info-tip">Максимум ~2900 символов</div>
     </div>
 
     <!-- Панель: Файл -->
@@ -311,7 +302,7 @@
         <input type="file" id="fileInput" style="display: none;">
         <div id="fileNameDisplay"></div>
       </div>
-      <div class="info-tip">Поддерживаются: изображения, PDF, документы до 1.5 МБ</div>
+      <div class="info-tip">Поддерживаются: изображения, PDF, документы (txt, docx).<br>Максимум ~1.5 МБ</div>
     </div>
 
     <button class="gen-btn" id="generateBtn">✨ Создать QR-код</button>
@@ -348,10 +339,6 @@
     
     const urlInput = document.getElementById("urlInput");
     const plainTextarea = document.getElementById("plainText");
-    const contactName = document.getElementById("contactName");
-    const contactPhone = document.getElementById("contactPhone");
-    const contactEmail = document.getElementById("contactEmail");
-    const contactOrg = document.getElementById("contactOrg");
     const fileInput = document.getElementById("fileInput");
     const fileDropZone = document.getElementById("fileDropZone");
     const fileNameDisplay = document.getElementById("fileNameDisplay");
@@ -363,11 +350,16 @@
         if(btn.dataset.format === format) btn.classList.add("active");
         else btn.classList.remove("active");
       });
-      ['url', 'text', 'contact', 'file'].forEach(f => {
-        const panel = document.getElementById(`panel-${f}`);
-        if(f === format) panel.classList.add("active-pane");
-        else panel.classList.remove("active-pane");
-      });
+      
+      // Показываем нужную панель
+      document.getElementById("panel-url").classList.remove("active-pane");
+      document.getElementById("panel-text").classList.remove("active-pane");
+      document.getElementById("panel-file").classList.remove("active-pane");
+      
+      if (format === "url") document.getElementById("panel-url").classList.add("active-pane");
+      else if (format === "text") document.getElementById("panel-text").classList.add("active-pane");
+      else if (format === "file") document.getElementById("panel-file").classList.add("active-pane");
+      
       downloadBtnArea.style.display = "none";
       qrcodeWrapper.classList.remove("visible");
       qrcodeDiv.innerHTML = "";
@@ -381,14 +373,15 @@
 
     // ----- Автоматический подбор уровня коррекции ошибок -----
     function getOptimalCorrectLevel(dataLength) {
-      if (dataLength <= 1264) return QRCode.CorrectLevel.H;
-      if (dataLength <= 1660) return QRCode.CorrectLevel.Q;
-      if (dataLength <= 2330) return QRCode.CorrectLevel.M;
-      if (dataLength <= 2950) return QRCode.CorrectLevel.L;
-      return null;
+      // Максимальная вместимость для разных уровней коррекции
+      if (dataLength <= 1264) return QRCode.CorrectLevel.H;   // 30% коррекции
+      if (dataLength <= 1660) return QRCode.CorrectLevel.Q;   // 25% коррекции
+      if (dataLength <= 2330) return QRCode.CorrectLevel.M;   // 15% коррекции
+      if (dataLength <= 2950) return QRCode.CorrectLevel.L;   // 7% коррекции
+      return null; // слишком много данных
     }
 
-    // ----- Генерация QR -----
+    // ----- Генерация QR с умным подбором уровня -----
     function generateQRFromString(textData) {
       qrcodeDiv.innerHTML = "";
       
@@ -396,11 +389,19 @@
       const level = getOptimalCorrectLevel(dataLength);
       
       if (!level) {
-        alert(`Данные слишком большие (${dataLength} символов).\nМаксимум 2950 символов.\nПопробуйте сократить текст или файл.`);
+        alert(`Данные слишком большие (${dataLength} символов).\nМаксимальная вместимость QR-кода — 2950 символов.\nПопробуйте сократить текст или использовать файл меньшего размера.`);
         qrcodeWrapper.classList.remove("visible");
         downloadBtnArea.style.display = "none";
         return;
       }
+      
+      let levelName = "";
+      if (level === QRCode.CorrectLevel.H) levelName = "H (30% коррекции)";
+      else if (level === QRCode.CorrectLevel.Q) levelName = "Q (25% коррекции)";
+      else if (level === QRCode.CorrectLevel.M) levelName = "M (15% коррекции)";
+      else levelName = "L (7% коррекции)";
+      
+      console.log(`Генерация QR: ${dataLength} символов, уровень ${levelName}`);
       
       qrcodeWrapper.classList.add("visible");
       
@@ -420,7 +421,7 @@
         }, 100);
       } catch(e) {
         console.error("QR Error:", e);
-        alert(`Ошибка: ${e.message}\nДлина: ${dataLength} символов.`);
+        alert(`Ошибка генерации QR: ${e.message}\nДлина данных: ${dataLength} символов.\nПопробуйте сократить текст.`);
         downloadBtnArea.style.display = "none";
         qrcodeWrapper.classList.remove("visible");
       }
@@ -429,6 +430,10 @@
     // ----- Обработка файла -----
     function handleFile(file) {
       if (!file) return;
+      const sizeMB = file.size / (1024 * 1024);
+      if (sizeMB > 2.5) {
+        alert("Файл больше 2.5 МБ — QR может не вместить данные. Рекомендуется до 1.5 МБ.");
+      }
       currentFileName = file.name;
       fileNameDisplay.innerText = `📄 ${file.name} (${(file.size/1024).toFixed(1)} KB)`;
       
@@ -439,17 +444,15 @@
           alert("Ошибка чтения файла");
           return;
         }
-        const fileDataString = `FILE:${file.name}\nTYPE:${file.type}\nSIZE:${file.size}\nDATA:${base64}`;
+        const totalChars = base64.length;
+        if(totalChars > 2900) {
+          alert(`Внимание: файл в кодировке base64 занимает ${totalChars} символов.\nQR-код может не вместить данные. Рекомендуются файлы до 500 КБ.`);
+        }
+        const fileDataString = `FILE_DATA:${file.type}:${currentFileName}:${base64}`;
         lastGeneratedData = fileDataString;
         generateQRFromString(lastGeneratedData);
       };
       reader.readAsDataURL(file);
-    }
-
-    // ----- Очистка текста от спецсимволов -----
-    function cleanText(str, maxLen = 100) {
-      if (!str) return '';
-      return str.replace(/[\\,;\n\r\t]/g, ' ').replace(/\s+/g, ' ').trim().substring(0, maxLen);
     }
 
     // ----- Получение данных из активной панели -----
@@ -476,50 +479,10 @@
             return null;
           }
           if(txt.length > 2900) {
-            alert(`Текст слишком длинный (${txt.length} символов). Максимум 2900.`);
+            alert(`Текст слишком длинный (${txt.length} символов).\nМаксимум ~2900 символов. Сократите текст.`);
             return null;
           }
           return txt;
-          
-        case "contact":
-          // КОНТАКТ В ВИДЕ ТЕКСТА — ПРОСТО И НАДЁЖНО
-          let name = contactName.value.trim();
-          let phone = contactPhone.value.trim();
-          let email = contactEmail.value.trim();
-          let org = contactOrg.value.trim();
-          
-          if(!name && !phone && !email) {
-            alert("Заполните хотя бы имя, телефон или email");
-            return null;
-          }
-          
-          // Очищаем телефон (только цифры и плюс)
-          let cleanPhone = phone.replace(/[^0-9+]/g, '');
-          if (cleanPhone === "+") cleanPhone = "";
-          
-          // Очищаем остальные поля от спецсимволов
-          let cleanName = cleanText(name, 80);
-          let cleanEmail = email.replace(/[^\w@.-]/g, '').toLowerCase().substring(0, 80);
-          let cleanOrg = cleanText(org, 60);
-          
-          // Формируем читаемый текстовый контакт
-          let contactText = [];
-          contactText.push("═ КОНТАКТ ═");
-          if (cleanName) contactText.push(`👤 Имя: ${cleanName}`);
-          if (cleanPhone) contactText.push(`📞 Телефон: ${cleanPhone}`);
-          if (cleanEmail) contactText.push(`✉ Email: ${cleanEmail}`);
-          if (cleanOrg) contactText.push(`🏢 Компания: ${cleanOrg}`);
-          contactText.push("═════════════");
-          
-          let result = contactText.join("\n");
-          
-          if (result.length > 2900) {
-            alert("Контакт слишком длинный, сократите поля");
-            return null;
-          }
-          
-          console.log("Контакт (текст), длина:", result.length);
-          return result;
           
         case "file":
           if(!fileInput.files.length) {
@@ -534,7 +497,7 @@
       }
     }
 
-    // ----- Основная генерация -----
+    // ----- Основная генерация по кнопке -----
     function onGenerate() {
       const data = getCurrentData();
       if(data === "PROCESSING_FILE") return;
@@ -543,24 +506,25 @@
       generateQRFromString(data);
     }
 
-    // ----- Скачивание QR-кода -----
+    // ----- Скачивание QR-кода (только по кнопке) -----
     function downloadQRAsPNG() {
       if (!lastGeneratedData) {
         alert("Сначала создайте QR-код через кнопку «Создать QR-код»");
         return;
       }
       
-      let canvas = currentQRCanvas || qrcodeDiv.querySelector("canvas");
+      let canvas = currentQRCanvas;
+      if (!canvas) {
+        canvas = qrcodeDiv.querySelector("canvas");
+      }
       
       if (canvas) {
         let filename = "qrcode.png";
         if(currentFormat === "file" && currentFileName) {
           let base = currentFileName.split('.')[0] || "file";
           filename = `QR_${base}.png`;
-        } else if(currentFormat === "url") {
+        } else if(currentFormat === "url" && urlInput.value.trim()) {
           filename = "QR_link.png";
-        } else if(currentFormat === "contact") {
-          filename = "QR_contact.png";
         } else if(currentFormat === "text") {
           filename = "QR_text.png";
         }
@@ -574,13 +538,14 @@
           alert("Ошибка сохранения изображения");
         }
       } else {
-        // Создаём временный QR для скачивания
+        // Если canvas нет — создаём временный для скачивания
         if(lastGeneratedData) {
           const tempDiv = document.createElement("div");
           tempDiv.style.position = "absolute";
           tempDiv.style.left = "-9999px";
           document.body.appendChild(tempDiv);
-          const level = getOptimalCorrectLevel(lastGeneratedData.length) || QRCode.CorrectLevel.L;
+          const dataLength = lastGeneratedData.length;
+          const level = getOptimalCorrectLevel(dataLength) || QRCode.CorrectLevel.L;
           const tempQR = new QRCode(tempDiv, {
             text: lastGeneratedData,
             width: 330,
@@ -595,14 +560,13 @@
               let filename = "qrcode.png";
               if(currentFormat === "file" && currentFileName) filename = `QR_${currentFileName.split('.')[0]}.png`;
               else if(currentFormat === "url") filename = "QR_link.png";
-              else if(currentFormat === "contact") filename = "QR_contact.png";
               else if(currentFormat === "text") filename = "QR_text.png";
               const link = document.createElement('a');
               link.download = filename;
               link.href = newCanvas.toDataURL("image/png");
               link.click();
             } else {
-              alert("Не удалось создать изображение");
+              alert("Не удалось создать изображение QR-кода");
             }
             document.body.removeChild(tempDiv);
           }, 100);
@@ -612,7 +576,7 @@
       }
     }
 
-    // ----- Файловые обработчики -----
+    // ----- Файловые обработчики (drag & drop + клик) -----
     fileDropZone.addEventListener("click", () => fileInput.click());
     fileInput.addEventListener("change", (e) => {
       if(e.target.files.length) handleFile(e.target.files[0]);
