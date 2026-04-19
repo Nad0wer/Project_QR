@@ -527,7 +527,7 @@
           }
           return txt;
           
-        case "contact":
+case "contact":
   let name = contactName.value.trim();
   let phone = contactPhone.value.trim();
   let email = contactEmail.value.trim();
@@ -612,27 +612,6 @@
   
   console.log("vCard готов, длина:", vcard.length, "символов");
   return vcard;
-          if(vcard.length > 2950) {
-            alert(`Контакт слишком большой (${vcard.length} символов).\nМаксимум 2950 символов. Сократите текст полей.`);
-            return null;
-          }
-          
-          console.log("vCard длина:", vcard.length);
-          return vcard;
-          
-        case "file":
-          if(!fileInput.files.length) {
-            alert("Выберите файл через область загрузки");
-            return null;
-          }
-          handleFile(fileInput.files[0]);
-          return "PROCESSING_FILE";
-          
-        default:
-          return null;
-      }
-    }
-
     // ----- Основная генерация по кнопке -----
     function onGenerate() {
       const data = getCurrentData();
