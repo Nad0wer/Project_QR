@@ -528,44 +528,90 @@
           return txt;
           
         case "contact":
-          let name = contactName.value.trim();
-          let phone = contactPhone.value.trim();
-          let email = contactEmail.value.trim();
-          let org = contactOrg.value.trim();
-          
-          if(!name && !phone && !email) {
-            alert("Заполните хотя бы имя, телефон или email");
-            return null;
-          }
-          
-          // Очистка телефона — только цифры и плюс
-          let cleanPhone = phone.replace(/[^0-9+]/g, '');
-          if (cleanPhone === "+") cleanPhone = "";
-          
-          // Экранирование полей
-          let cleanName = escapeVCardField(name);
-          let cleanEmail = escapeVCardField(email);
-          let cleanOrg = escapeVCardField(org);
-          
-          // Формируем компактный vCard (без поля N: для экономии места)
-          let vcard = "BEGIN:VCARD\nVERSION:3.0\n";
-          if(cleanName) vcard += `FN:${cleanName}\n`;
-          if(cleanPhone) vcard += `TEL:${cleanPhone}\n`;
-          if(cleanEmail) vcard += `EMAIL:${cleanEmail}\n`;
-          if(cleanOrg) vcard += `ORG:${cleanOrg}\n`;
-          vcard += "END:VCARD";
-          
-          // Если всё ещё слишком много — предложим удалить компанию
-          if(vcard.length > 2800 && org) {
-            if(confirm("Контакт слишком большой для QR-кода. Удалить поле 'Компания'?")) {
-              vcard = "BEGIN:VCARD\nVERSION:3.0\n";
-              if(cleanName) vcard += `FN:${cleanName}\n`;
-              if(cleanPhone) vcard += `TEL:${cleanPhone}\n`;
-              if(cleanEmail) vcard += `EMAIL:${cleanEmail}\n`;
-              vcard += "END:VCARD";
-            }
-          }
-          
+  let name = contactName.value.trim();
+  let phone = contactPhone.value.trim();
+  let email = contactEmail.value.trim();
+  let org = contactOrg.value.trim();
+  
+  if(!name && !phone && !email) {
+    alert("Заполните хотя бы имя, телефон или email");
+    return null;
+  }
+  
+  // Функция очистки текста для vCard (удаляем недопустимые символы)
+  function cleanVCardText(str) {
+    if (!str) return '';
+    // Удаляем управляющие символы, оставляем только печатные
+    return str.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+              .replace(/[\\,;]/g, ' ')  // заменяем спецсимволы на пробелы
+              .replace(/\s+/g, ' ')      // несколько пробелов в один
+              .trim();
+  }
+  
+  // Очищаем поля
+  let cleanName = cleanVCardText(name);
+  let cleanPhone = phone.replace(/[^0-9+]/g, ''); // только цифры и плюс
+  let cleanEmail = cleanVCardText(email).toLowerCase();
+  let cleanOrg = cleanVCardText(org);
+  
+  // Разбиваем имя на части (для N: поля)
+  let firstName = cleanName;
+  let lastName = "";
+  if (cleanName.includes(" ")) {
+    let parts = cleanName.split(" ");
+    lastName = parts[0];
+    firstName = parts.slice(1).join(" ") || lastName;
+  }
+  
+  // Формируем vCard 4.0 (более компактный и совместимый)
+  let vcardLines = [];
+  vcardLines.push("BEGIN:VCARD");
+  vcardLines.push("VERSION:4.0");
+  
+  if (cleanName) {
+    vcardLines.push(`FN:${cleanName}`);
+    vcardLines.push(`N:${lastName};${firstName};;;`);
+  }
+  
+  if (cleanPhone && cleanPhone.length > 3) {
+    vcardLines.push(`TEL;TYPE=cell:${cleanPhone}`);
+  }
+  
+  if (cleanEmail && cleanEmail.includes("@")) {
+    vcardLines.push(`EMAIL:${cleanEmail}`);
+  }
+  
+  if (cleanOrg && cleanOrg.length > 0 && cleanOrg.length < 100) {
+    vcardLines.push(`ORG:${cleanOrg}`);
+  }
+  
+  vcardLines.push("END:VCARD");
+  
+  let vcard = vcardLines.join("\n");
+  
+  // Проверка длины и автоматическое урезание при необходимости
+  let maxLength = 2800;
+  if (vcard.length > maxLength) {
+    // Пробуем убрать поле ORG
+    if (cleanOrg) {
+      vcardLines = vcardLines.filter(line => !line.startsWith("ORG:"));
+      vcard = vcardLines.join("\n");
+    }
+    // Если всё ещё длинно — укорачиваем имя
+    if (vcard.length > maxLength && cleanName && cleanName.length > 20) {
+      let shortName = cleanName.substring(0, 20);
+      vcard = vcard.replace(`FN:${cleanName}`, `FN:${shortName}`);
+      vcard = vcard.replace(`N:${lastName};${firstName};;;`, `N:${shortName};;;`);
+    }
+    // Если всё ещё слишком много — предупреждаем
+    if (vcard.length > maxLength) {
+      alert(`Контакт слишком большой (${vcard.length} символов).\nРекомендуем сократить имя (до 20 символов) или удалить компанию.`);
+      return null;
+    }
+  }
+  
+  console.log("vCard готов, длина:", vcard.length, "символов");
+  return vcard;
           if(vcard.length > 2950) {
             alert(`Контакт слишком большой (${vcard.length} символов).\nМаксимум 2950 символов. Сократите текст полей.`);
             return null;
