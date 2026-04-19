@@ -476,15 +476,21 @@
     }
 
 function generateQRFromString(textData) {
-  // Проверка длины данных
-  if(textData.length > 2950) {
-    alert("Слишком много данных! QR-код не может вместить такой объем.\nМаксимум ~2950 символов.\nПопробуйте сократить текст или использовать файл меньшего размера.");
+  qrcodeDiv.innerHTML = "";
+  qrcodeWrapper.classList.add("visible");
+  
+  // Автоматический подбор уровня коррекции
+  let level;
+  if (textData.length <= 1264) level = QRCode.CorrectLevel.H;
+  else if (textData.length <= 1660) level = QRCode.CorrectLevel.Q;
+  else if (textData.length <= 2330) level = QRCode.CorrectLevel.M;
+  else if (textData.length <= 2950) level = QRCode.CorrectLevel.L;
+  else {
+    alert(`Данные слишком большие (${textData.length} символов).\nМаксимум 2950 символов.\nПопробуйте сократить текст или файл.`);
     qrcodeWrapper.classList.remove("visible");
     return;
   }
   
-  qrcodeDiv.innerHTML = "";
-  qrcodeWrapper.classList.add("visible");
   try {
     currentQR = new QRCode(qrcodeDiv, {
       text: textData,
@@ -492,7 +498,7 @@ function generateQRFromString(textData) {
       height: 280,
       colorDark: "#dabfff",
       colorLight: "#404042",
-      correctLevel: QRCode.CorrectLevel.H
+      correctLevel: level
     });
     downloadBtnArea.style.display = "block";
     setTimeout(() => {
@@ -501,10 +507,11 @@ function generateQRFromString(textData) {
     }, 100);
   } catch(e) {
     console.error("QR Error:", e);
-    alert("Ошибка генерации QR: " + e.message + "\nПопробуйте сократить данные или убрать спецсимволы.");
+    alert(`Ошибка: ${e.message}\nПопробуйте сократить данные (сейчас ${textData.length} символов).`);
     downloadBtnArea.style.display = "none";
     qrcodeWrapper.classList.remove("visible");
   }
+}
 }
     // Сохраняем canvas (если создан библиотекой) для последующего скачивания
     function captureCanvasForDownload() {
